@@ -937,7 +937,7 @@ export class ChatWidget extends Disposable implements IChatWidget {
 		} else if (this.input.currentModeKind === ChatModeKind.Edit) {
 			title = localize('editsTitle', "Edit in context");
 		} else {
-			title = localize('agentTitle', "Build with IRA");
+			title = localize('agentTitle', "IRA");
 		}
 
 		return {
