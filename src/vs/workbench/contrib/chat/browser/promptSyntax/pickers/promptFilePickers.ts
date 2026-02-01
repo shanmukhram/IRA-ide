@@ -170,7 +170,7 @@ const UPDATE_INSTRUCTIONS_OPTION: IPromptPickerQuickPickItem = {
 	type: 'item',
 	label: `$(refresh) ${localize(
 		'commands.update-instructions.select-dialog.label',
-		'Generate agent instructions...',
+		'Generate IRA instructions...',
 	)}`,
 	pickable: false,
 	alwaysShow: true,

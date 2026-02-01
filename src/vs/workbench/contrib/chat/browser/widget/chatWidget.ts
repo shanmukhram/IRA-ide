@@ -873,7 +873,7 @@ export class ChatWidget extends Disposable implements IChatWidget {
 			const generateInstructionsCommand = 'workbench.action.chat.generateInstructions';
 			return new MarkdownString(localize(
 				'chatWidget.instructions',
-				"[Generate Agent Instructions]({0}) to onboard AI onto your codebase.",
+				"[Generate IRA Instructions]({0}) to onboard AI onto your codebase.",
 				`command:${generateInstructionsCommand}`
 			), { isTrusted: { enabledCommands: [generateInstructionsCommand] } });
 		}
@@ -883,8 +883,8 @@ export class ChatWidget extends Disposable implements IChatWidget {
 	}
 
 	/**
-	 * Checks if any agent instruction files (.github/copilot-instructions.md or AGENTS.md) exist in the workspace.
-	 * Used to determine whether to show the "Generate Agent Instructions" hint.
+	 * Checks if any agent instruction files (.github/ira-instructions.md or AGENTS.md) exist in the workspace.
+	 * Used to determine whether to show the "Generate IRA Instructions" hint.
 	 *
 	 * @returns true if instruction files exist OR if instruction features are disabled (to hide the hint)
 	 */
@@ -918,7 +918,7 @@ export class ChatWidget extends Disposable implements IChatWidget {
 			// Fallback to default messages if provider doesn't specify
 			const message = providerMessage
 				? new MarkdownString(providerMessage)
-				: (this._lockedAgent?.prefix === '@copilot '
+				: (this._lockedAgent?.prefix === '@ira '
 					? new MarkdownString(localize('copilotCodingAgentMessage', "This chat session will be forwarded to the {0} [coding agent]({1}) where work is completed in the background. ", this._lockedAgent.prefix, 'https://aka.ms/coding-agent-docs') + DISCLAIMER, { isTrusted: true })
 					: new MarkdownString(localize('genericCodingAgentMessage', "This chat session will be forwarded to the {0} coding agent where work is completed in the background. ", this._lockedAgent?.prefix) + DISCLAIMER));
 
@@ -937,7 +937,7 @@ export class ChatWidget extends Disposable implements IChatWidget {
 		} else if (this.input.currentModeKind === ChatModeKind.Edit) {
 			title = localize('editsTitle', "Edit in context");
 		} else {
-			title = localize('agentTitle', "Build with Agent");
+			title = localize('agentTitle', "Build with IRA");
 		}
 
 		return {
@@ -2396,7 +2396,7 @@ export class ChatWidget extends Disposable implements IChatWidget {
 	/**
 	 * Adds additional instructions to the context
 	 * - instructions that have a 'applyTo' pattern that matches the current input
-	 * - instructions referenced in the copilot settings 'copilot-instructions'
+	 * - instructions referenced in the ira settings 'ira-instructions'
 	 * - instructions referenced in an already included instruction file
 	 */
 	private async _autoAttachInstructions({ attachedContext }: IChatRequestInputOptions): Promise<void> {
