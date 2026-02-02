@@ -111,6 +111,7 @@ export class IraApprovalsView extends ViewPane {
 
 	private approvalsService!: IraApprovalsService;
 	private list!: WorkbenchList<ApprovalElement>;
+	private showOnlyPending = true;
 
 	constructor(
 		options: IViewPaneOptions,
@@ -143,10 +144,12 @@ export class IraApprovalsView extends ViewPane {
 		// Force labels visible (ActionBar in some contexts defaults to icon-only styling)
 		const style = append(container, $('style'));
 		style.textContent = `
+			.ira-approvals-toolbar { display: flex; align-items: center; gap: 6px; }
 			.ira-approvals-toolbar .action-label { display: inline !important; }
 			.ira-approvals-toolbar .action-item .label { display: inline !important; }
 			.ira-approvals-toolbar .action-item .codicon { margin-right: 6px; }
 			.ira-approvals-toolbar .action-item { padding: 0 6px; }
+			.ira-approvals-legend { opacity: 0.85; padding-left: 6px; }
 			.ira-approvals-status { display: flex; align-items: center; gap: 6px; }
 			.ira-approvals-status-icon { opacity: 0.9; }
 			.ira-approvals-status-label { opacity: 0.9; }
@@ -158,6 +161,17 @@ export class IraApprovalsView extends ViewPane {
 			ThemeIcon.asClassName(Codicon.add),
 			true,
 			() => this.commandService.executeCommand('ira.approvals.request')
+		);
+
+		const togglePending = new Action(
+			'ira.approvals.togglePending',
+			'Pending only',
+			ThemeIcon.asClassName(Codicon.filter),
+			true,
+			() => {
+				this.showOnlyPending = !this.showOnlyPending;
+				this.refresh();
+			}
 		);
 
 		const approve = new Action(
@@ -197,11 +211,13 @@ export class IraApprovalsView extends ViewPane {
 		);
 
 		this._register(request);
+		this._register(togglePending);
 		this._register(approve);
 		this._register(reject);
 		this._register(clear);
 
 		actionbar.push(request, { icon: true, label: true });
+		actionbar.push(togglePending, { icon: true, label: true });
 		actionbar.push(approve, { icon: true, label: true });
 		actionbar.push(reject, { icon: true, label: true });
 		actionbar.push(clear, { icon: true, label: true });
@@ -226,13 +242,29 @@ export class IraApprovalsView extends ViewPane {
 			this._onDidChangeSelection.fire(this.getSelected());
 		}));
 
-		this.refresh();
-		this._register(this.approvalsService.onDidChange(() => this.refresh()));
+		const legend = append(toolbar, $('.ira-approvals-legend'));
+		legend.textContent = '';
+
+		this.refresh(legend);
+		this._register(this.approvalsService.onDidChange(() => this.refresh(legend)));
 	}
 
-	private refresh(): void {
-		const items = this.approvalsService.getItems().map(item => ({ item } satisfies ApprovalElement));
-		this.list.splice(0, this.list.length, items);
+	private refresh(legend?: HTMLElement): void {
+		let items = this.approvalsService.getItems();
+		const total = items.length;
+		const pendingCount = items.filter(i => i.status === 'pending').length;
+		const approvedCount = items.filter(i => i.status === 'approved').length;
+		const rejectedCount = items.filter(i => i.status === 'rejected').length;
+
+		if (this.showOnlyPending) {
+			items = items.filter(i => i.status === 'pending');
+		}
+
+		if (legend) {
+			legend.textContent = `Pending ${pendingCount} · Approved ${approvedCount} · Rejected ${rejectedCount} · Total ${total}`;
+		}
+
+		this.list.splice(0, this.list.length, items.map(item => ({ item } satisfies ApprovalElement)));
 	}
 
 	private getSelected(): ApprovalElement | undefined {
