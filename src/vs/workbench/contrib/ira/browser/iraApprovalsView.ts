@@ -111,10 +111,20 @@ export class IraApprovalsView extends ViewPane {
 
 		const toolbar = append(container, $('.ira-approvals-toolbar'));
 		const actionbar = this._register(new ActionBar(toolbar));
+		actionbar.domNode.classList.add('ira-approvals-actionbar');
+
+		// Force labels visible (ActionBar in some contexts defaults to icon-only styling)
+		const style = append(container, $('style'));
+		style.textContent = `
+			.ira-approvals-toolbar .action-label { display: inline !important; }
+			.ira-approvals-toolbar .action-item .label { display: inline !important; }
+			.ira-approvals-toolbar .action-item .codicon { margin-right: 6px; }
+			.ira-approvals-toolbar .action-item { padding: 0 6px; }
+		`;
 
 		const request = new Action(
 			'ira.approvals.request',
-			'Request approval',
+			'Request',
 			ThemeIcon.asClassName(Codicon.add),
 			true,
 			() => this.commandService.executeCommand('ira.approvals.request')
