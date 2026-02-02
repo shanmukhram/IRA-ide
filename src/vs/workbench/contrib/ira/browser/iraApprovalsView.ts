@@ -161,10 +161,10 @@ export class IraApprovalsView extends ViewPane {
 		this._register(reject);
 		this._register(clear);
 
-		actionbar.push(request, { icon: true, label: false });
-		actionbar.push(approve, { icon: true, label: false });
-		actionbar.push(reject, { icon: true, label: false });
-		actionbar.push(clear, { icon: true, label: false });
+		actionbar.push(request, { icon: true, label: true });
+		actionbar.push(approve, { icon: true, label: true });
+		actionbar.push(reject, { icon: true, label: true });
+		actionbar.push(clear, { icon: true, label: true });
 
 		const listContainer = append(container, $('.ira-approvals-list'));
 		const delegate = new ApprovalsDelegate();
