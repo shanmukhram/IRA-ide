@@ -44,6 +44,8 @@ interface ApprovalsTemplate {
 	readonly container: HTMLElement;
 	readonly title: HTMLElement;
 	readonly status: HTMLElement;
+	readonly statusIcon: HTMLElement;
+	readonly statusLabel: HTMLElement;
 }
 
 class ApprovalsRenderer implements IListRenderer<ApprovalElement, ApprovalsTemplate> {
@@ -55,14 +57,39 @@ class ApprovalsRenderer implements IListRenderer<ApprovalElement, ApprovalsTempl
 
 		const row = append(container, $('.ira-approvals-row-inner'));
 		const title = append(row, $('.ira-approvals-title'));
-		const status = append(row, $('.ira-approvals-status'));
 
-		return { container, title, status };
+		const status = append(row, $('.ira-approvals-status'));
+		const statusIcon = append(status, $('span.codicon.ira-approvals-status-icon'));
+		const statusLabel = append(status, $('span.ira-approvals-status-label'));
+
+		return { container, title, status, statusIcon, statusLabel };
 	}
 
 	renderElement(element: ApprovalElement, _index: number, template: ApprovalsTemplate): void {
 		template.title.textContent = element.item.title;
-		template.status.textContent = element.item.status.toUpperCase();
+
+		const icon = template.statusIcon;
+		const label = template.statusLabel;
+
+		icon.className = 'codicon ira-approvals-status-icon';
+
+		let statusLabel = '';
+		switch (element.item.status) {
+			case 'pending':
+				statusLabel = 'Pending';
+				icon?.classList.add('codicon-clock');
+				break;
+			case 'approved':
+				statusLabel = 'Approved';
+				icon?.classList.add('codicon-check');
+				break;
+			case 'rejected':
+				statusLabel = 'Rejected';
+				icon?.classList.add('codicon-close');
+				break;
+		}
+
+		label.textContent = statusLabel;
 
 		template.container.classList.toggle('is-pending', element.item.status === 'pending');
 		template.container.classList.toggle('is-approved', element.item.status === 'approved');
@@ -120,6 +147,9 @@ export class IraApprovalsView extends ViewPane {
 			.ira-approvals-toolbar .action-item .label { display: inline !important; }
 			.ira-approvals-toolbar .action-item .codicon { margin-right: 6px; }
 			.ira-approvals-toolbar .action-item { padding: 0 6px; }
+			.ira-approvals-status { display: flex; align-items: center; gap: 6px; }
+			.ira-approvals-status-icon { opacity: 0.9; }
+			.ira-approvals-status-label { opacity: 0.9; }
 		`;
 
 		const request = new Action(
