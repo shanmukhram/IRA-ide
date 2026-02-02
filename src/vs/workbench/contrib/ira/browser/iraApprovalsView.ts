@@ -3,29 +3,83 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
-import { $, append } from '../../../../base/browser/dom.js';
+import { append, $ } from '../../../../base/browser/dom.js';
+import { Emitter } from '../../../../base/common/event.js';
 import { DisposableStore } from '../../../../base/common/lifecycle.js';
 import { localize2 } from '../../../../nls.js';
 import { ICommandService } from '../../../../platform/commands/common/commands.js';
 import { IContextKeyService } from '../../../../platform/contextkey/common/contextkey.js';
-import { IInstantiationService } from '../../../../platform/instantiation/common/instantiation.js';
-import { IKeybindingService } from '../../../../platform/keybinding/common/keybinding.js';
-import { IOpenerService } from '../../../../platform/opener/common/opener.js';
-import { IThemeService } from '../../../../platform/theme/common/themeService.js';
-import { IViewPaneOptions, ViewPane } from '../../../browser/parts/views/viewPane.js';
-import { IViewDescriptorService } from '../../../common/views.js';
 import { IContextMenuService } from '../../../../platform/contextview/browser/contextView.js';
 import { IConfigurationService } from '../../../../platform/configuration/common/configuration.js';
+import { IInstantiationService } from '../../../../platform/instantiation/common/instantiation.js';
+import { IKeybindingService } from '../../../../platform/keybinding/common/keybinding.js';
+import { IListRenderer, IListVirtualDelegate } from '../../../../base/browser/ui/list/list.js';
+import { WorkbenchList } from '../../../../platform/list/browser/listService.js';
+import { IOpenerService } from '../../../../platform/opener/common/opener.js';
+import { IThemeService } from '../../../../platform/theme/common/themeService.js';
 import { IHoverService } from '../../../../platform/hover/browser/hover.js';
+import { IViewDescriptorService } from '../../../common/views.js';
+import { IViewPaneOptions, ViewPane } from '../../../browser/parts/views/viewPane.js';
 import { IIraApprovalItem, IraApprovalsService } from './iraApprovals.js';
+
+interface ApprovalElement {
+	readonly item: IIraApprovalItem;
+}
+
+class ApprovalsDelegate implements IListVirtualDelegate<ApprovalElement> {
+	getHeight(): number {
+		return 22;
+	}
+
+	getTemplateId(): string {
+		return ApprovalsRenderer.TEMPLATE_ID;
+	}
+}
+
+interface ApprovalsTemplate {
+	readonly container: HTMLElement;
+	readonly title: HTMLElement;
+	readonly status: HTMLElement;
+}
+
+class ApprovalsRenderer implements IListRenderer<ApprovalElement, ApprovalsTemplate> {
+	static readonly TEMPLATE_ID = 'iraApprovalRow';
+	readonly templateId = ApprovalsRenderer.TEMPLATE_ID;
+
+	renderTemplate(container: HTMLElement): ApprovalsTemplate {
+		container.classList.add('ira-approvals-row');
+
+		const row = append(container, $('.ira-approvals-row-inner'));
+		const title = append(row, $('.ira-approvals-title'));
+		const status = append(row, $('.ira-approvals-status'));
+
+		return { container, title, status };
+	}
+
+	renderElement(element: ApprovalElement, _index: number, template: ApprovalsTemplate): void {
+		template.title.textContent = element.item.title;
+		template.status.textContent = element.item.status.toUpperCase();
+
+		template.container.classList.toggle('is-pending', element.item.status === 'pending');
+		template.container.classList.toggle('is-approved', element.item.status === 'approved');
+		template.container.classList.toggle('is-rejected', element.item.status === 'rejected');
+	}
+
+	disposeTemplate(_template: ApprovalsTemplate): void {
+		// noop
+	}
+}
 
 export class IraApprovalsView extends ViewPane {
 	static readonly ID = 'ira.approvalsView';
 	static readonly TITLE = localize2('iraApprovals', 'Approvals');
 
 	private readonly disposables = new DisposableStore();
+	private readonly _onDidChangeSelection = this._register(new Emitter<ApprovalElement | undefined>());
+	readonly onDidChangeSelection = this._onDidChangeSelection.event;
+
 	private approvalsService!: IraApprovalsService;
-	private listContainer!: HTMLElement;
+	private list!: WorkbenchList<ApprovalElement>;
 
 	constructor(
 		options: IViewPaneOptions,
@@ -47,68 +101,74 @@ export class IraApprovalsView extends ViewPane {
 	protected override renderBody(container: HTMLElement): void {
 		super.renderBody(container);
 
+		// piggyback on VS Code/SCM list styles (monaco list look)
+		container.classList.add('scm-view');
 		container.classList.add('ira-approvals-view');
 
-		const header = append(container, $('.ira-approvals-header'));
-		const actions = append(header, $('.ira-approvals-actions'));
+		const toolbar = append(container, $('.ira-approvals-toolbar'));
 
-		const requestBtn = append(actions, $('button.ira-btn', { type: 'button' }));
-		requestBtn.textContent = 'Request approval';
-		this.disposables.add({ dispose: () => requestBtn.remove() });
-		requestBtn.addEventListener('click', () => {
+		const request = append(toolbar, $('button.monaco-button', { type: 'button' }));
+		request.textContent = 'Request';
+		request.addEventListener('click', () => {
 			void this.commandService.executeCommand('ira.approvals.request');
 		});
 
-		const clearBtn = append(actions, $('button.ira-btn.secondary', { type: 'button' }));
-		clearBtn.textContent = 'Clear';
-		this.disposables.add({ dispose: () => clearBtn.remove() });
-		clearBtn.addEventListener('click', () => {
+		const approve = append(toolbar, $('button.monaco-button.secondary', { type: 'button' }));
+		approve.textContent = 'Approve';
+		approve.addEventListener('click', () => {
+			const selected = this.getSelected();
+			if (selected) {
+				void this.commandService.executeCommand('ira.approvals.approve', selected.item.id);
+			}
+		});
+
+		const reject = append(toolbar, $('button.monaco-button.secondary', { type: 'button' }));
+		reject.textContent = 'Reject';
+		reject.addEventListener('click', () => {
+			const selected = this.getSelected();
+			if (selected) {
+				void this.commandService.executeCommand('ira.approvals.reject', selected.item.id);
+			}
+		});
+
+		const clear = append(toolbar, $('button.monaco-button.secondary', { type: 'button' }));
+		clear.textContent = 'Clear';
+		clear.addEventListener('click', () => {
 			void this.commandService.executeCommand('ira.approvals.clear');
 		});
 
-		this.listContainer = append(container, $('.ira-approvals-list'));
-		this.renderList();
+		const listContainer = append(container, $('.ira-approvals-list'));
+		const delegate = new ApprovalsDelegate();
+		this.list = this._register(this.instantiationService.createInstance(
+			WorkbenchList<ApprovalElement>,
+			'IraApprovals',
+			listContainer,
+			delegate,
+			[new ApprovalsRenderer()],
+			{
+				accessibilityProvider: {
+					getAriaLabel: (e: ApprovalElement) => e.item.title,
+					getWidgetAriaLabel: () => 'IRA Approvals'
+				}
+			}
+		));
 
-		this._register(this.approvalsService.onDidChange(() => this.renderList()));
+		this._register(this.list.onDidChangeSelection(() => {
+			this._onDidChangeSelection.fire(this.getSelected());
+		}));
+
+		this.refresh();
+		this._register(this.approvalsService.onDidChange(() => this.refresh()));
 	}
 
-	private renderList(): void {
-		this.listContainer.textContent = '';
-		const items = this.approvalsService.getItems();
-
-		if (!items.length) {
-			const empty = append(this.listContainer, $('.ira-empty'));
-			empty.textContent = 'No approvals yet.';
-			return;
-		}
-
-		for (const item of items) {
-			this.renderItem(item);
-		}
+	private refresh(): void {
+		const items = this.approvalsService.getItems().map(item => ({ item } satisfies ApprovalElement));
+		this.list.splice(0, this.list.length, items);
 	}
 
-	private renderItem(item: IIraApprovalItem): void {
-		const row = append(this.listContainer, $('.ira-approval-row'));
-		const title = append(row, $('.ira-approval-title'));
-		title.textContent = item.title;
-
-		const meta = append(row, $('.ira-approval-meta'));
-		meta.textContent = item.status.toUpperCase();
-
-		const buttons = append(row, $('.ira-approval-buttons'));
-		if (item.status === 'pending') {
-			const approve = append(buttons, $('button.ira-btn.small', { type: 'button' }));
-			approve.textContent = 'Approve';
-			approve.addEventListener('click', () => {
-				void this.commandService.executeCommand('ira.approvals.approve', item.id);
-			});
-
-			const reject = append(buttons, $('button.ira-btn.small.secondary', { type: 'button' }));
-			reject.textContent = 'Reject';
-			reject.addEventListener('click', () => {
-				void this.commandService.executeCommand('ira.approvals.reject', item.id);
-			});
-		}
+	private getSelected(): ApprovalElement | undefined {
+		const selected = this.list.getSelectedElements();
+		return selected?.[0];
 	}
 
 	override dispose(): void {
