@@ -7,6 +7,10 @@ import { append, $ } from '../../../../base/browser/dom.js';
 import { Emitter } from '../../../../base/common/event.js';
 import { DisposableStore } from '../../../../base/common/lifecycle.js';
 import { localize2 } from '../../../../nls.js';
+import { Action } from '../../../../base/common/actions.js';
+import { Codicon } from '../../../../base/common/codicons.js';
+import { ThemeIcon } from '../../../../base/common/themables.js';
+import { ActionBar } from '../../../../base/browser/ui/actionbar/actionbar.js';
 import { ICommandService } from '../../../../platform/commands/common/commands.js';
 import { IContextKeyService } from '../../../../platform/contextkey/common/contextkey.js';
 import { IContextMenuService } from '../../../../platform/contextview/browser/contextView.js';
@@ -106,36 +110,61 @@ export class IraApprovalsView extends ViewPane {
 		container.classList.add('ira-approvals-view');
 
 		const toolbar = append(container, $('.ira-approvals-toolbar'));
+		const actionbar = this._register(new ActionBar(toolbar));
 
-		const request = append(toolbar, $('button.monaco-button', { type: 'button' }));
-		request.textContent = 'Request';
-		request.addEventListener('click', () => {
-			void this.commandService.executeCommand('ira.approvals.request');
-		});
+		const request = new Action(
+			'ira.approvals.request',
+			'Request approval',
+			ThemeIcon.asClassName(Codicon.add),
+			true,
+			() => this.commandService.executeCommand('ira.approvals.request')
+		);
 
-		const approve = append(toolbar, $('button.monaco-button.secondary', { type: 'button' }));
-		approve.textContent = 'Approve';
-		approve.addEventListener('click', () => {
-			const selected = this.getSelected();
-			if (selected) {
-				void this.commandService.executeCommand('ira.approvals.approve', selected.item.id);
+		const approve = new Action(
+			'ira.approvals.approve.selected',
+			'Approve',
+			ThemeIcon.asClassName(Codicon.check),
+			true,
+			() => {
+				const selected = this.getSelected();
+				if (selected) {
+					return this.commandService.executeCommand('ira.approvals.approve', selected.item.id);
+				}
+				return Promise.resolve();
 			}
-		});
+		);
 
-		const reject = append(toolbar, $('button.monaco-button.secondary', { type: 'button' }));
-		reject.textContent = 'Reject';
-		reject.addEventListener('click', () => {
-			const selected = this.getSelected();
-			if (selected) {
-				void this.commandService.executeCommand('ira.approvals.reject', selected.item.id);
+		const reject = new Action(
+			'ira.approvals.reject.selected',
+			'Reject',
+			ThemeIcon.asClassName(Codicon.close),
+			true,
+			() => {
+				const selected = this.getSelected();
+				if (selected) {
+					return this.commandService.executeCommand('ira.approvals.reject', selected.item.id);
+				}
+				return Promise.resolve();
 			}
-		});
+		);
 
-		const clear = append(toolbar, $('button.monaco-button.secondary', { type: 'button' }));
-		clear.textContent = 'Clear';
-		clear.addEventListener('click', () => {
-			void this.commandService.executeCommand('ira.approvals.clear');
-		});
+		const clear = new Action(
+			'ira.approvals.clear',
+			'Clear',
+			ThemeIcon.asClassName(Codicon.trash),
+			true,
+			() => this.commandService.executeCommand('ira.approvals.clear')
+		);
+
+		this._register(request);
+		this._register(approve);
+		this._register(reject);
+		this._register(clear);
+
+		actionbar.push(request, { icon: true, label: false });
+		actionbar.push(approve, { icon: true, label: false });
+		actionbar.push(reject, { icon: true, label: false });
+		actionbar.push(clear, { icon: true, label: false });
 
 		const listContainer = append(container, $('.ira-approvals-list'));
 		const delegate = new ApprovalsDelegate();
