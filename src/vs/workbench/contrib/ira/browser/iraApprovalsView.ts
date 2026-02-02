@@ -113,6 +113,9 @@ export class IraApprovalsView extends ViewPane {
 	private list!: WorkbenchList<ApprovalElement>;
 	private showOnlyPending = true;
 
+	private approveAction?: Action;
+	private rejectAction?: Action;
+
 	constructor(
 		options: IViewPaneOptions,
 		@IKeybindingService keybindingService: IKeybindingService,
@@ -170,7 +173,7 @@ export class IraApprovalsView extends ViewPane {
 			true,
 			() => {
 				this.showOnlyPending = !this.showOnlyPending;
-				this.refresh();
+				this.refresh(legend);
 			}
 		);
 
@@ -178,7 +181,7 @@ export class IraApprovalsView extends ViewPane {
 			'ira.approvals.approve.selected',
 			'Approve',
 			ThemeIcon.asClassName(Codicon.check),
-			true,
+			false,
 			() => {
 				const selected = this.getSelected();
 				if (selected) {
@@ -192,7 +195,7 @@ export class IraApprovalsView extends ViewPane {
 			'ira.approvals.reject.selected',
 			'Reject',
 			ThemeIcon.asClassName(Codicon.close),
-			true,
+			false,
 			() => {
 				const selected = this.getSelected();
 				if (selected) {
@@ -201,6 +204,9 @@ export class IraApprovalsView extends ViewPane {
 				return Promise.resolve();
 			}
 		);
+
+		this.approveAction = approve;
+		this.rejectAction = reject;
 
 		const clear = new Action(
 			'ira.approvals.clear',
@@ -239,7 +245,16 @@ export class IraApprovalsView extends ViewPane {
 		));
 
 		this._register(this.list.onDidChangeSelection(() => {
-			this._onDidChangeSelection.fire(this.getSelected());
+			const selected = this.getSelected();
+			this._onDidChangeSelection.fire(selected);
+
+			const isPending = !!selected && selected.item.status === 'pending';
+			if (this.approveAction) {
+				this.approveAction.enabled = isPending;
+			}
+			if (this.rejectAction) {
+				this.rejectAction.enabled = isPending;
+			}
 		}));
 
 		const legend = append(toolbar, $('.ira-approvals-legend'));
